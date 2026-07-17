@@ -1,0 +1,9 @@
+[package]
+name = "my-mac-tray"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tray-icon = "0.14"
+winit = "0.29"
+chrono = "0.4"

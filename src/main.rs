@@ -2,12 +2,31 @@ use chrono::Local;
 use std::time::{Duration, Instant};
 use tray_icon::TrayIconBuilder;
 use winit::event_loop::{ControlFlow, EventLoopBuilder};
+use obfstr::obfstr;
+
+#[derive(Clone)] // Allows sharing across threads easily
+pub struct AppConfig {
+    pub api_key: String,
+    pub port: u16,
+}
+
+impl AppConfig {
+    // Call this exactly once at the start of your program
+    pub fn load() -> Self {
+        Self {
+            api_key: obfstr!("my-super-key").to_string(),
+            port: 8080, // Normal configs don't need obfuscation
+        }
+    }
+}
 
 // This is a macOS-specific trait that lets us hide the app from the Dock
 #[cfg(target_os = "macos")]
 use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let app_config = AppConfig::load();
+    println!("Loaded config: API key = {}, port = {}", app_config.api_key, app_config.port);
     // 1. Set up the event loop
     let mut builder = EventLoopBuilder::new();
 

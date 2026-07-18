@@ -3,7 +3,9 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::error::Error;
 
-// Structs to deserialize the JSON responses from Portkey matching your `jq` filters
+// ---------------------------------------------------------
+// Internal structs for JSON deserialization
+// ---------------------------------------------------------
 #[derive(Deserialize)]
 struct Workspace {
     slug: String,
@@ -24,12 +26,27 @@ struct CostResponse {
     summary: CostSummary,
 }
 
+// ---------------------------------------------------------
+// Public structs to return structured data to the caller
+// ---------------------------------------------------------
+#[derive(Debug, Clone)]
+pub struct WorkspaceCost {
+    pub slug: String,
+    pub spend_usd: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct PortkeyCostResult {
+    pub total_usd: f64,
+    pub workspaces: Vec<WorkspaceCost>,
+}
+
 /// Fetches the Portkey cost since the start of the current month.
 pub async fn get_portkey_cost(
     api_key: &str,
     workspace: Option<&str>,
     virtual_key: Option<&str>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<PortkeyCostResult, Box<dyn Error>> {
     let client = Client::new();
 
     // Calculate dates matching the Fish `date -u` commands
@@ -48,7 +65,6 @@ pub async fn get_portkey_cost(
             .await?;
 
         if !res.status().is_success() {
-            eprintln!("Error: Failed to fetch workspaces");
             return Err("Failed to fetch workspaces".into());
         }
 
@@ -57,12 +73,9 @@ pub async fn get_portkey_cost(
     };
 
     let mut total_cents = 0.0;
+    let mut workspace_costs = Vec::new();
 
     for ws in workspaces {
-        println!("Workplace: {}", ws);
-        println!("Start: {}", start_of_month);
-        println!("End: {}", now);
-
         // Build the query parameters dynamically
         let mut query = vec![
             ("time_of_generation_min", start_of_month.as_str()),
@@ -92,13 +105,18 @@ pub async fn get_portkey_cost(
         let ws_cents = cost_res.summary.total.unwrap_or(0.0);
         let ws_usd = ws_cents / 100.0;
 
-        println!("Spend: ${:.4}", ws_usd);
+        workspace_costs.push(WorkspaceCost {
+            slug: ws,
+            spend_usd: ws_usd,
+        });
+
         total_cents += ws_cents;
     }
 
     let total_usd = total_cents / 100.0;
-    println!("─────────────────────────────");
-    println!("Total: ${:.4}", total_usd);
 
-    Ok(())
+    Ok(PortkeyCostResult {
+        total_usd,
+        workspaces: workspace_costs,
+    })
 }

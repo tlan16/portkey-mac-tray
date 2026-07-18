@@ -95,16 +95,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. Spawn an async task into the background
     rt.spawn(async move {
-        // You can now call async functions here safely!
-        println!("Async task started...");
+        // Since it's a loop, you can fetch it every X minutes!
+        loop {
+            // Call our updated lib function
+            match lib_portkey::get_portkey_cost(&APP_CONFIG.portkey_api_key, None, None).await {
+                Ok(data) => {
+                    // Format the total into a string like "PK: $36.38"
+                    let display_text = format!("Portkey: ${:.2}", data.total_usd);
 
-        // Simulate an async network request (e.g., calling lib_portkey::fetch_data().await)
-        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                    // Send to Winit UI thread
+                    let _ = proxy.send_event(AppEvent::PortkeyDataReceived(display_text));
+                }
+                Err(e) => {
+                    eprintln!("Failed to fetch Portkey data: {}", e);
+                    let _ = proxy.send_event(AppEvent::PortkeyDataReceived("PK: Error".to_string()));
+                }
+            }
 
-        let api_result = "Portkey: 🟢 Online".to_string();
-
-        // Send the result back to the winit UI thread
-        let _ = proxy.send_event(AppEvent::PortkeyDataReceived(api_result));
+            // Sleep for 5 minutes before checking again
+            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+        }
     });
 
     let mut app = MyApp { tray_icon: None };

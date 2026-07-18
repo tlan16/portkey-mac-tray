@@ -7,7 +7,6 @@
 
   outputs = { self, nixpkgs }:
     let
-      # M4 is aarch64-darwin, but we include x86_64-darwin for completeness
       systems = [ "aarch64-darwin" "x86_64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in
@@ -20,31 +19,26 @@
           default = pkgs.rustPlatform.buildRustPackage {
             pname = "my-mac-tray";
             version = "0.1.0";
-
-            # The source is the current directory
             src = ./.;
 
-            # Use the existing Cargo.lock to resolve dependency versions
             cargoLock = {
               lockFile = ./Cargo.lock;
             };
 
-            # macOS requires specific native frameworks to compile UI and Network code
-            buildInputs = with pkgs.darwin.apple_sdk.frameworks; [
-              AppKit
-              CoreGraphics
-              CoreServices
-              Foundation
-              Security            # Needed by reqwest (native-tls)
-              SystemConfiguration # Needed by reqwest
-            ] ++ [
+            # Use the explicit, modern framework paths
+            buildInputs = [
+              pkgs.darwin.apple_sdk.frameworks.AppKit
+              pkgs.darwin.apple_sdk.frameworks.CoreGraphics
+              pkgs.darwin.apple_sdk.frameworks.CoreServices
+              pkgs.darwin.apple_sdk.frameworks.Foundation
+              pkgs.darwin.apple_sdk.frameworks.Security
+              pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
               pkgs.libiconv
             ];
           };
         }
       );
 
-      # Allows you to test it locally without installing by running `nix run`
       apps = forAllSystems (system: {
         default = {
           type = "app";

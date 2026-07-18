@@ -1,26 +1,40 @@
+mod lib_portkey;
+mod app_config;
+
 use chrono::Local;
 use std::time::{Duration, Instant};
 use tray_icon::{TrayIcon, TrayIconBuilder};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
-// macOS-specific imports
 #[cfg(target_os = "macos")]
 use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
+use crate::app_config::APP_CONFIG;
 
-// 1. Define a Struct to hold our application state
-// We store the tray_icon here so it stays alive for the life of the app.
+// ---------------------------------------------------------
+// 1. Define custom events (Tokio -> Winit communication)
+// ---------------------------------------------------------
+#[derive(Debug)]
+pub enum AppEvent {
+    // We can add events here like API responses
+    PortkeyDataReceived(String),
+}
+
+// ---------------------------------------------------------
+// APP STATE & EVENT LOOP
+// ---------------------------------------------------------
 struct MyApp {
     tray_icon: Option<TrayIcon>,
 }
 
-// 2. Implement the ApplicationHandler trait
-impl ApplicationHandler for MyApp {
-    // This is called when the OS is ready for us to initialize our UI
+// Notice we changed `ApplicationHandler` to `ApplicationHandler<AppEvent>`
+impl ApplicationHandler<AppEvent> for MyApp {
     fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
         if self.tray_icon.is_none() {
+            println!("Loaded config: API key = {}", APP_CONFIG.portkey_api_key);
+
             let icon = TrayIconBuilder::new()
                 .with_title("Starting...")
                 .build()
@@ -30,21 +44,31 @@ impl ApplicationHandler for MyApp {
         }
     }
 
-    // This is called constantly while the app is sleeping/waking
-    // It replaces the old closure we had before.
+    // 2. This new function receives messages from our Tokio tasks!
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: AppEvent) {
+        match event {
+            AppEvent::PortkeyDataReceived(data) => {
+                println!("UI Thread received async data: {}", data);
+                if let Some(tray_icon) = &self.tray_icon {
+                    tray_icon.set_title(Some(data));
+                }
+            }
+        }
+    }
+
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        // Tell the event_loop (formerly `elwt`) to wake us up in 1 second
         let now = Instant::now();
         event_loop.set_control_flow(ControlFlow::WaitUntil(now + Duration::from_secs(1)));
 
-        // Update the menu bar title
+        // We can keep the ticking clock, or remove it if you only want API data
+        /*
         if let Some(tray_icon) = &self.tray_icon {
             let current_time = Local::now().format("%H:%M:%S").to_string();
             tray_icon.set_title(Some(current_time));
         }
+        */
     }
 
-    // Required by the trait, but we can ignore it since we don't have Windows yet
     fn window_event(
         &mut self,
         _event_loop: &ActiveEventLoop,
@@ -53,20 +77,39 @@ impl ApplicationHandler for MyApp {
     ) {}
 }
 
+// NO #[tokio::main] here! We keep it a standard sync main function.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Set up the Event Loop Builder
-    let mut builder = EventLoop::builder();
+    // 3. Build the event loop WITH our custom AppEvent type
+    let mut builder = EventLoop::<AppEvent>::with_user_event();
 
-    // Hide from the Dock and CMD+Tab
     #[cfg(target_os = "macos")]
     builder.with_activation_policy(ActivationPolicy::Accessory);
 
     let event_loop = builder.build()?;
 
-    // Create our app state
+    // Create a proxy. This can be safely cloned and sent to other threads/async tasks!
+    let proxy: EventLoopProxy<AppEvent> = event_loop.create_proxy();
+
+    // 4. Create the Tokio runtime manually
+    let rt = tokio::runtime::Runtime::new()?;
+
+    // 5. Spawn an async task into the background
+    rt.spawn(async move {
+        // You can now call async functions here safely!
+        println!("Async task started...");
+
+        // Simulate an async network request (e.g., calling lib_portkey::fetch_data().await)
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+        let api_result = "Portkey: 🟢 Online".to_string();
+
+        // Send the result back to the winit UI thread
+        let _ = proxy.send_event(AppEvent::PortkeyDataReceived(api_result));
+    });
+
     let mut app = MyApp { tray_icon: None };
 
-    // 3. Run the app using the new `run_app` method!
+    // 6. Run the winit UI loop on the main thread (blocks forever)
     event_loop.run_app(&mut app)?;
 
     Ok(())

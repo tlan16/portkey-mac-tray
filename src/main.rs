@@ -1,7 +1,6 @@
 mod lib_portkey;
 mod app_config;
 
-use chrono::Local;
 use std::time::{Duration, Instant};
 use tray_icon::{TrayIcon, TrayIconBuilder};
 use winit::application::ApplicationHandler;
@@ -9,9 +8,9 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
+use crate::app_config::APP_CONFIG;
 #[cfg(target_os = "macos")]
 use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
-use crate::app_config::APP_CONFIG;
 
 // ---------------------------------------------------------
 // 1. Define custom events (Tokio -> Winit communication)

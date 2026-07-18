@@ -30,15 +30,8 @@ struct CostResponse {
 // Public structs to return structured data to the caller
 // ---------------------------------------------------------
 #[derive(Debug, Clone)]
-pub struct WorkspaceCost {
-    pub slug: String,
-    pub spend_usd: f64,
-}
-
-#[derive(Debug, Clone)]
 pub struct PortkeyCostResult {
     pub total_usd: f64,
-    pub workspaces: Vec<WorkspaceCost>,
 }
 
 /// Fetches the Portkey cost since the start of the current month.
@@ -73,7 +66,6 @@ pub async fn get_portkey_cost(
     };
 
     let mut total_cents = 0.0;
-    let mut workspace_costs = Vec::new();
 
     for ws in workspaces {
         // Build the query parameters dynamically
@@ -103,13 +95,6 @@ pub async fn get_portkey_cost(
 
         // Extract `.summary.total // 0`
         let ws_cents = cost_res.summary.total.unwrap_or(0.0);
-        let ws_usd = ws_cents / 100.0;
-
-        workspace_costs.push(WorkspaceCost {
-            slug: ws,
-            spend_usd: ws_usd,
-        });
-
         total_cents += ws_cents;
     }
 
@@ -117,6 +102,5 @@ pub async fn get_portkey_cost(
 
     Ok(PortkeyCostResult {
         total_usd,
-        workspaces: workspace_costs,
     })
 }

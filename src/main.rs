@@ -1,56 +1,73 @@
 use chrono::Local;
 use std::time::{Duration, Instant};
-use tray_icon::TrayIconBuilder;
-use winit::event_loop::{ControlFlow, EventLoopBuilder};
-use obfstr::obfstr;
+use tray_icon::{TrayIcon, TrayIconBuilder};
+use winit::application::ApplicationHandler;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::window::WindowId;
 
-#[derive(Clone)] // Allows sharing across threads easily
-pub struct AppConfig {
-    pub api_key: String,
-    pub port: u16,
-}
-
-impl AppConfig {
-    // Call this exactly once at the start of your program
-    pub fn load() -> Self {
-        Self {
-            api_key: obfstr!("my-super-key").to_string(),
-            port: 8080, // Normal configs don't need obfuscation
-        }
-    }
-}
-
-// This is a macOS-specific trait that lets us hide the app from the Dock
+// macOS-specific imports
 #[cfg(target_os = "macos")]
 use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_config = AppConfig::load();
-    println!("Loaded config: API key = {}, port = {}", app_config.api_key, app_config.port);
-    // 1. Set up the event loop
-    let mut builder = EventLoopBuilder::new();
+// 1. Define a Struct to hold our application state
+// We store the tray_icon here so it stays alive for the life of the app.
+struct MyApp {
+    tray_icon: Option<TrayIcon>,
+}
 
-    // Tell macOS this is an "Accessory" app (runs in menu bar, hides from Dock and CMD+Tab)
+// 2. Implement the ApplicationHandler trait
+impl ApplicationHandler for MyApp {
+    // This is called when the OS is ready for us to initialize our UI
+    fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
+        if self.tray_icon.is_none() {
+            let icon = TrayIconBuilder::new()
+                .with_title("Starting...")
+                .build()
+                .expect("Failed to build tray icon");
+
+            self.tray_icon = Some(icon);
+        }
+    }
+
+    // This is called constantly while the app is sleeping/waking
+    // It replaces the old closure we had before.
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        // Tell the event_loop (formerly `elwt`) to wake us up in 1 second
+        let now = Instant::now();
+        event_loop.set_control_flow(ControlFlow::WaitUntil(now + Duration::from_secs(1)));
+
+        // Update the menu bar title
+        if let Some(tray_icon) = &self.tray_icon {
+            let current_time = Local::now().format("%H:%M:%S").to_string();
+            tray_icon.set_title(Some(current_time));
+        }
+    }
+
+    // Required by the trait, but we can ignore it since we don't have Windows yet
+    fn window_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _id: WindowId,
+        _event: WindowEvent,
+    ) {}
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Set up the Event Loop Builder
+    let mut builder = EventLoop::builder();
+
+    // Hide from the Dock and CMD+Tab
     #[cfg(target_os = "macos")]
     builder.with_activation_policy(ActivationPolicy::Accessory);
 
     let event_loop = builder.build()?;
 
-    // 2. Create the menu bar item
-    // On macOS, tray icons don't strictly need an image; they can just be text!
-    let mut tray_icon = TrayIconBuilder::new().with_title("Starting...").build()?;
+    // Create our app state
+    let mut app = MyApp { tray_icon: None };
 
-    // 3. Run the event loop
-    event_loop.run(move |_event, elwt| {
-        // Tell the OS to wake this thread up exactly 1 second from now.
-        // This is crucial! It ensures your app uses 0.0% CPU while idling.
-        let now = Instant::now();
-        elwt.set_control_flow(ControlFlow::WaitUntil(now + Duration::from_secs(1)));
-
-        // Get the current time and update the menu bar title
-        let current_time = Local::now().format("%H:%M:%S").to_string();
-        tray_icon.set_title(Some(&current_time));
-    })?;
+    // 3. Run the app using the new `run_app` method!
+    event_loop.run_app(&mut app)?;
 
     Ok(())
 }

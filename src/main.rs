@@ -1,6 +1,7 @@
-mod lib_portkey;
-mod app_config;
+use my_mac_tray::lib_portkey;
+use my_mac_tray::app_config::APP_CONFIG;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tray_icon::{TrayIcon, TrayIconBuilder};
 use winit::application::ApplicationHandler;
@@ -8,9 +9,22 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
-use crate::app_config::APP_CONFIG;
 #[cfg(target_os = "macos")]
 use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
+
+// ---------------------------------------------------------
+// 0. Verbose logging (global flag + helper macro)
+// ---------------------------------------------------------
+static VERBOSE: AtomicBool = AtomicBool::new(false);
+
+/// Prints only when `--verbose` is enabled. Behaves like `println!`.
+macro_rules! vlog {
+    ($($arg:tt)*) => {
+        if VERBOSE.load(Ordering::Relaxed) {
+            println!($($arg)*);
+        }
+    };
+}
 
 // ---------------------------------------------------------
 // 1. Define custom events (Tokio -> Winit communication)
@@ -32,7 +46,7 @@ struct MyApp {
 impl ApplicationHandler<AppEvent> for MyApp {
     fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
         if self.tray_icon.is_none() {
-            println!("Loaded config: API key = {}", APP_CONFIG.portkey_api_key);
+            vlog!("Loaded config: API key = {}", APP_CONFIG.portkey_api_key);
 
             let icon = TrayIconBuilder::new()
                 .with_title("Starting...")
@@ -47,7 +61,7 @@ impl ApplicationHandler<AppEvent> for MyApp {
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: AppEvent) {
         match event {
             AppEvent::PortkeyDataReceived(data) => {
-                println!("UI Thread received async data: {}", data);
+                vlog!("UI Thread received async data: {}", data);
                 if let Some(tray_icon) = &self.tray_icon {
                     tray_icon.set_title(Some(data));
                 }
@@ -58,14 +72,6 @@ impl ApplicationHandler<AppEvent> for MyApp {
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
         event_loop.set_control_flow(ControlFlow::WaitUntil(now + Duration::from_secs(1)));
-
-        // We can keep the ticking clock, or remove it if you only want API data
-        /*
-        if let Some(tray_icon) = &self.tray_icon {
-            let current_time = Local::now().format("%H:%M:%S").to_string();
-            tray_icon.set_title(Some(current_time));
-        }
-        */
     }
 
     fn window_event(
@@ -78,6 +84,11 @@ impl ApplicationHandler<AppEvent> for MyApp {
 
 // NO #[tokio::main] here! We keep it a standard sync main function.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 0. Parse CLI args. `--verbose` (or `-v`) is optional and defaults to off.
+    let verbose = std::env::args().any(|a| a == "--verbose" || a == "-v");
+    VERBOSE.store(verbose, Ordering::Relaxed);
+    vlog!("Verbose logging enabled");
+
     // 3. Build the event loop WITH our custom AppEvent type
     let mut builder = EventLoop::<AppEvent>::with_user_event();
 
@@ -94,25 +105,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. Spawn an async task into the background
     rt.spawn(async move {
-        // Since it's a loop, you can fetch it every X minutes!
+        // Holds the last successfully-fetched display text.
+        let mut last_display: Option<String> = None;
+
         loop {
-            // Call our updated lib function
             match lib_portkey::get_portkey_cost(&APP_CONFIG.portkey_api_key, None, None).await {
                 Ok(data) => {
-                    // Format the total into a string like "PK: $36.38"
+                    // Format the total into a string like "Portkey: $36.38"
                     let display_text = format!("Portkey: ${:.2}", data.total_usd);
+                    vlog!("Fetched Portkey cost: {}", display_text);
+
+                    // Remember it for the next failure.
+                    last_display = Some(display_text.clone());
 
                     // Send to Winit UI thread
                     let _ = proxy.send_event(AppEvent::PortkeyDataReceived(display_text));
                 }
                 Err(e) => {
+                    // Errors always print, regardless of verbosity.
                     eprintln!("Failed to fetch Portkey data: {}", e);
-                    let _ = proxy.send_event(AppEvent::PortkeyDataReceived("PK: Error".to_string()));
+
+                    // Reuse the previous value with an "e" suffix to flag it as stale.
+                    let fallback = match &last_display {
+                        Some(prev) => format!("{prev}e"),
+                        None => "PK: Error".to_string(),
+                    };
+
+                    let _ = proxy.send_event(AppEvent::PortkeyDataReceived(fallback));
                 }
             }
 
-            // Sleep for 5 minutes before checking again
-            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+            // Sleep for 1 minute before checking again
+            tokio::time::sleep(tokio::time::Duration::from_mins(1)).await;
         }
     });
 

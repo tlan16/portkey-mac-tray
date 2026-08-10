@@ -8,12 +8,25 @@ pub struct AppConfig {
     pub portkey_api_key: String,
 }
 
-// LazyLock ensures the obfuscated string is decrypted and allocated
+/// Resolve the Portkey API key with the following precedence:
+/// 1. `PORTKEY_API_KEY` environment variable
+/// 2. `.env` file in the project root (loaded via dotenvy)
+/// 3. Compile-time obfuscated fallback
+fn resolve_portkey_api_key() -> String {
+    // Load .env from CWD (or nearest parent). Does nothing if no .env exists.
+    dotenvy::dotenv().ok();
+
+    // Check env var (covers both pre-existing env vars and .env-loaded values).
+    // dotenvy never overwrites already-set env vars, so real env vars win automatically.
+    std::env::var("PORTKEY_API_KEY").unwrap_or_else(|_| {
+        obfstr!("REDACTED_API_KEY").to_string()
+    })
+}
+
+// LazyLock ensures the config is initialised
 // EXACTLY ONCE the first time `APP_CONFIG` is accessed.
 pub static APP_CONFIG: LazyLock<AppConfig> = LazyLock::new(|| {
     AppConfig {
-        // obfstr! macro encrypts the string at compile time.
-        // It is decrypted here at runtime into a standard String.
-        portkey_api_key: obfstr!("REDACTED_API_KEY").to_string(),
+        portkey_api_key: resolve_portkey_api_key(),
     }
 });

@@ -2377,6 +2377,7 @@ name = "my-mac-tray"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dotenvy",
  "obfstr",
  "reqwest 0.12.28",
  "serde",

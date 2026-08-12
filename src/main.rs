@@ -1,5 +1,5 @@
-use my_mac_tray::lib_portkey;
 use my_mac_tray::app_config::APP_CONFIG;
+use my_mac_tray::lib_portkey;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -46,10 +46,19 @@ struct MyApp {
 impl ApplicationHandler<AppEvent> for MyApp {
     fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
         if self.tray_icon.is_none() {
-            vlog!("Loaded config: API key = {}", APP_CONFIG.portkey_api_key);
+            let title = match &*APP_CONFIG {
+                Ok(cfg) => {
+                    vlog!("Loaded config: API key = {}", cfg.portkey_api_key);
+                    "Starting...".to_string()
+                }
+                Err(e) => {
+                    eprintln!("Config error: {}", e);
+                    format!("PK: Error: {e}")
+                }
+            };
 
             let icon = TrayIconBuilder::new()
-                .with_title("Starting...")
+                .with_title(&title)
                 .build()
                 .expect("Failed to build tray icon");
 
@@ -105,11 +114,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. Spawn an async task into the background
     rt.spawn(async move {
+        // Check if config loaded successfully; if not, show error once and stop.
+        let api_key = match &*APP_CONFIG {
+            Ok(cfg) => cfg.portkey_api_key.clone(),
+            Err(e) => {
+                let msg = format!("PK: Config Error: {e}");
+                eprintln!("{msg}");
+                let _ = proxy.send_event(AppEvent::PortkeyDataReceived(msg));
+                return;
+            }
+        };
+
         // Holds the last successfully-fetched display text.
         let mut last_display: Option<String> = None;
 
         loop {
-            match lib_portkey::get_portkey_cost(&APP_CONFIG.portkey_api_key, None, None).await {
+            match lib_portkey::get_portkey_cost(&api_key, None, None).await {
                 Ok(data) => {
                     // Format the total into a string like "Portkey: $36.38"
                     let display_text = format!("Portkey: ${:.2}", data.total_usd);

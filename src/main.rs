@@ -155,7 +155,7 @@ impl MyApp {
 
 fn prompt_for_api_key() -> Option<()> {
     // Use AppleScript with "System Events" for a native dialog
-    // This doesn't require Terminal.app
+    // Empty input will delete the existing API key
     let script = r#"
 display dialog "Enter Portkey API Key:" default answer "" with hidden answer buttons {"Cancel", "OK"} default button "OK"
 set apiKey to text returned of result
@@ -174,18 +174,27 @@ return apiKey
                 .to_string();
             
             if key.is_empty() {
-                eprintln!("API key prompt cancelled or empty");
-                return None;
-            }
-            
-            match app_config::set_api_key(&key) {
-                Ok(()) => {
-                    vlog!("API key stored successfully");
-                    Some(())
+                // Empty key means delete the existing key
+                match app_config::delete_api_key() {
+                    Ok(()) => {
+                        vlog!("API key deleted from keychain");
+                        Some(())
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to delete API key: {}", e);
+                        None
+                    }
                 }
-                Err(e) => {
-                    eprintln!("Failed to store API key: {}", e);
-                    None
+            } else {
+                match app_config::set_api_key(&key) {
+                    Ok(()) => {
+                        vlog!("API key stored successfully");
+                        Some(())
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to store API key: {}", e);
+                        None
+                    }
                 }
             }
         }

@@ -157,7 +157,7 @@ if [ "$DO_DMG" = true ]; then
   fi
 
   echo ""
-  echo "==> DMG ready: $DMG_PATH"
+  echo "==> DMG (size: $(du -sh "$DMG_PATH" | cut -f1)) ready: $DMG_PATH"
 fi
 
 echo ""

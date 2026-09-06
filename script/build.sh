@@ -58,9 +58,15 @@ echo "==> Building $BINARY_NAME (${BUILD_DIR_NAME}) …"
 cd "$PROJECT_DIR"
 cargo build $RELEASE_FLAG
 
-BINARY_PATH="$PROJECT_DIR/target/$BUILD_DIR_NAME/$BINARY_NAME"
+# Check for cross-compiled target directory first
+if [ -x "$PROJECT_DIR/target/aarch64-apple-darwin/$BUILD_DIR_NAME/$BINARY_NAME" ]; then
+  BINARY_PATH="$PROJECT_DIR/target/aarch64-apple-darwin/$BUILD_DIR_NAME/$BINARY_NAME"
+else
+  BINARY_PATH="$PROJECT_DIR/target/$BUILD_DIR_NAME/$BINARY_NAME"
+fi
+
 if [ ! -x "$BINARY_PATH" ]; then
-  echo "ERROR: Binary not found at $BINARY_PATH"
+  echo "ERROR: Binary not found"
   exit 1
 fi
 

@@ -1,0 +1,14 @@
+# Build only for native architecture (M4 = aarch64)
+[build]
+target = "aarch64-apple-darwin"
+
+[target.aarch64-apple-darwin]
+# Use nightly build-std for minimal stdlib
+# Requires: rustup toolchain install nightly
+# Build with: cargo +nightly build --release
+rustflags = ["-C", "target-cpu=native"]
+
+# Uncomment below to enable build-std (requires nightly):
+# [unstable]
+# build-std = ["std", "panic_abort"]
+# build-std-features = ["panic_immediate_abort"]

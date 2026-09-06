@@ -154,15 +154,12 @@ impl MyApp {
 }
 
 fn prompt_for_api_key() -> Option<()> {
-    // Since tray apps don't have focus, we use AppleScript to prompt
-    // This opens Terminal.app with a secure input dialog
+    // Use AppleScript with "System Events" for a native dialog
+    // This doesn't require Terminal.app
     let script = r#"
-tell application "Terminal"
-    activate
-    set apiKey to display dialog "Enter Portkey API Key:" default answer "" with hidden answer
-    set apiKey to text returned of apiKey
-    return apiKey
-end tell
+display dialog "Enter Portkey API Key:" default answer "" with hidden answer buttons {"Cancel", "OK"} default button "OK"
+set apiKey to text returned of result
+return apiKey
 "#;
     
     let output = std::process::Command::new("osascript")

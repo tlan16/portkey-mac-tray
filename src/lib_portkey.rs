@@ -69,7 +69,7 @@ pub async fn get_portkey_cost(
 
     for ws in workspaces {
         // Build the query parameters dynamically
-        let mut query = vec![
+        let mut query: Vec<(&str, &str)> = vec![
             ("time_of_generation_min", start_of_month.as_str()),
             ("time_of_generation_max", now.as_str()),
             ("workspace_slug", ws.as_str()),

@@ -52,7 +52,7 @@ impl ApplicationHandler<AppEvent> for MyApp {
         if self.tray_icon.is_none() {
             let title = if self.has_api_key {
                 match &*APP_CONFIG {
-                    Ok(cfg) => {
+                    Ok(_cfg) => {
                         vlog!("Loaded config: API key present");
                         "Starting...".to_string()
                     }
@@ -89,7 +89,7 @@ impl ApplicationHandler<AppEvent> for MyApp {
             }
             AppEvent::MenuEvent(event) => {
                 vlog!("Menu event received: {:?}", event);
-                match event.id().as_str() {
+                match event.id().0.as_str() {
                     "quit" => event_loop.exit(),
                     "set-api-key" | "change-api-key" => {
                         // Prompt for API key and update state if successful
@@ -97,7 +97,7 @@ impl ApplicationHandler<AppEvent> for MyApp {
                             self.has_api_key = app_config::has_api_key();
                             if let Some(tray_icon) = &self.tray_icon {
                                 let tray_menu = self.build_menu();
-                                tray_icon.set_menu(Box::new(tray_menu));
+                                tray_icon.set_menu(Some(Box::new(tray_menu)));
                                 tray_icon.set_title(Some("Starting..."));
                             }
                             // Note: Restarting the background task would require more architecture changes
@@ -112,7 +112,7 @@ impl ApplicationHandler<AppEvent> for MyApp {
                 self.has_api_key = app_config::has_api_key();
                 if let Some(tray_icon) = &self.tray_icon {
                     let tray_menu = self.build_menu();
-                    tray_icon.set_menu(Box::new(tray_menu));
+                    tray_icon.set_menu(Some(Box::new(tray_menu)));
                     tray_icon.set_title(Some("Starting..."));
                 }
                 // Note: Full background task restart would require Arc<Mutex> architecture

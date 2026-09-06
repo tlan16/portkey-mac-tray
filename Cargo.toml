@@ -1,6 +1,6 @@
 [package]
 name = "my-mac-tray"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 [lib]
@@ -16,6 +16,6 @@ tray-icon = "0.24.1"
 winit = "0.30.13"
 chrono = "0.4.45"
 tokio = { version = "1.43", features = ["rt-multi-thread", "time"] }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13.4", features = ["json", "query"] }
 serde = { version = "1.0", features = ["derive"] }
-keyring = "3"
+keyring = "4.2.0"

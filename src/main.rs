@@ -2,16 +2,20 @@ use my_mac_tray::app_config::{self, APP_CONFIG};
 use my_mac_tray::lib_portkey;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::thread;
+use std::time::Duration;
 use tray_icon::menu::{Menu, MenuItem, MenuEvent as TrayMenuEvent, PredefinedMenuItem};
 use tray_icon::{TrayIcon, TrayIconBuilder};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
 #[cfg(target_os = "macos")]
 use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
+
+// Store the event loop proxy for the background thread
+static EVENT_PROXY: std::sync::OnceLock<EventLoopProxy<AppEvent>> = std::sync::OnceLock::new();
 
 // ---------------------------------------------------------
 // 0. Verbose logging (global flag + helper macro)
@@ -123,9 +127,8 @@ impl ApplicationHandler<AppEvent> for MyApp {
         }
     }
 
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        let now = Instant::now();
-        event_loop.set_control_flow(ControlFlow::WaitUntil(now + Duration::from_secs(1)));
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        // No-op: background thread handles periodic updates
     }
 
     fn window_event(
@@ -211,7 +214,7 @@ return apiKey
     }
 }
 
-// NO #[tokio::main] here! We keep it a standard sync main function.
+// NO async runtime here! We use simple threads.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 0. Parse CLI args. `--verbose` (or `-v`) is optional and defaults to off.
     let verbose = std::env::args().any(|a| a == "--verbose" || a == "-v");
@@ -226,16 +229,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let event_loop = builder.build()?;
 
-    // Create a proxy. This can be safely cloned and sent to other threads/async tasks!
+    // Create a proxy. This can be safely cloned and sent to other threads!
     let proxy: EventLoopProxy<AppEvent> = event_loop.create_proxy();
     let menu_proxy = proxy.clone();
 
-    // 4. Create the Tokio runtime manually
-    let rt = tokio::runtime::Runtime::new()?;
+    // Store proxy for background thread
+    EVENT_PROXY.set(proxy.clone()).ok();
 
-    // 5. Only spawn background task if API key exists
+    // 4. Spawn background thread if API key exists
     if app_config::has_api_key() {
-        rt.spawn(async move {
+        thread::spawn(move || {
             // Check if config loaded successfully; if not, show error once and stop.
             let api_key = match &*APP_CONFIG {
                 Ok(cfg) => cfg.portkey_api_key.clone(),
@@ -251,7 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut last_display: Option<String> = None;
 
             loop {
-                match lib_portkey::get_portkey_cost(&api_key, None, None).await {
+                match lib_portkey::get_portkey_cost(&api_key, None, None) {
                     Ok(data) => {
                         // Format the total into a string like "Portkey: $36.38"
                         let display_text = format!("Portkey: ${:.2}", data.total_usd);
@@ -278,7 +281,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 // Sleep for 1 minute before checking again
-                tokio::time::sleep(tokio::time::Duration::from_mins(1)).await;
+                thread::sleep(Duration::from_secs(60));
             }
         });
     }

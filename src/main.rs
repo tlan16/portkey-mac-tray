@@ -93,15 +93,17 @@ impl ApplicationHandler<AppEvent> for MyApp {
                     "quit" => event_loop.exit(),
                     "set-api-key" | "change-api-key" => {
                         // Prompt for API key and update state if successful
-                        if prompt_for_api_key().is_some() {
-                            self.has_api_key = app_config::has_api_key();
+                        if let Some(has_key) = prompt_for_api_key() {
+                            self.has_api_key = has_key;
                             if let Some(tray_icon) = &self.tray_icon {
                                 let tray_menu = self.build_menu();
                                 tray_icon.set_menu(Some(Box::new(tray_menu)));
-                                tray_icon.set_title(Some("Starting..."));
+                                if has_key {
+                                    tray_icon.set_title(Some("Key Saved - Restart App"));
+                                } else {
+                                    tray_icon.set_title(Some("Key Deleted - Restart App"));
+                                }
                             }
-                            // Note: Restarting the background task would require more architecture changes
-                            // For now, user needs to restart the app after setting the key
                         }
                     }
                     _ => {}
@@ -153,11 +155,11 @@ impl MyApp {
     }
 }
 
-fn prompt_for_api_key() -> Option<()> {
+fn prompt_for_api_key() -> Option<bool> {
     // Use AppleScript with "System Events" for a native dialog
     // Empty input will delete the existing API key
     let script = r#"
-display dialog "Enter Portkey API Key:" default answer "" with hidden answer buttons {"Cancel", "OK"} default button "OK"
+display dialog "Enter Portkey API Key (leave empty to delete):" default answer "" with hidden answer buttons {"Cancel", "OK"} default button "OK"
 set apiKey to text returned of result
 return apiKey
 "#;
@@ -178,7 +180,7 @@ return apiKey
                 match app_config::delete_api_key() {
                     Ok(()) => {
                         vlog!("API key deleted from keychain");
-                        Some(())
+                        Some(false) // false = no key set
                     }
                     Err(e) => {
                         eprintln!("Failed to delete API key: {}", e);
@@ -189,7 +191,7 @@ return apiKey
                 match app_config::set_api_key(&key) {
                     Ok(()) => {
                         vlog!("API key stored successfully");
-                        Some(())
+                        Some(true) // true = key is set
                     }
                     Err(e) => {
                         eprintln!("Failed to store API key: {}", e);

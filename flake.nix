@@ -25,14 +25,7 @@
               lockFile = ./Cargo.lock;
             };
 
-            # Use the explicit, modern framework paths
             buildInputs = [
-              pkgs.darwin.apple_sdk.frameworks.AppKit
-              pkgs.darwin.apple_sdk.frameworks.CoreGraphics
-              pkgs.darwin.apple_sdk.frameworks.CoreServices
-              pkgs.darwin.apple_sdk.frameworks.Foundation
-              pkgs.darwin.apple_sdk.frameworks.Security
-              pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
               pkgs.libiconv
             ];
           };

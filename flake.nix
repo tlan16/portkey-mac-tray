@@ -1,5 +1,5 @@
 {
-  description = "My Mac Tray widget fetching Portkey stats";
+  description = "Portkey Mac Tray widget fetching Portkey stats";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -17,7 +17,7 @@
         in
         {
           default = pkgs.rustPlatform.buildRustPackage {
-            pname = "my-mac-tray";
+            pname = "portkey-mac-tray";
             version = "0.3.0";
             src = ./.;
 
@@ -35,7 +35,7 @@
       apps = forAllSystems (system: {
         default = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/my-mac-tray";
+          program = "${self.packages.${system}.default}/bin/portkey-mac-tray";
         };
       });
     };

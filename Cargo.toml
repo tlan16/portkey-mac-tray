@@ -1,14 +1,14 @@
 [package]
-name = "my-mac-tray"
+name = "portkey-mac-tray"
 version = "0.3.0"
 edition = "2024"
 
 [lib]
-name = "my_mac_tray"
+name = "portkey_mac_tray"
 path = "src/lib.rs"
 
 [[bin]]
-name = "my-mac-tray"
+name = "portkey-mac-tray"
 path = "src/main.rs"
 
 [dependencies]

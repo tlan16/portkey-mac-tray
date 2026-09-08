@@ -1729,18 +1729,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "my-mac-tray"
-version = "0.3.0"
-dependencies = [
- "chrono",
- "keyring",
- "serde",
- "tray-icon",
- "ureq",
- "winit",
-]
-
-[[package]]
 name = "ndk"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2279,6 +2267,18 @@ dependencies = [
  "pin-project-lite",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "portkey-mac-tray"
+version = "0.3.0"
+dependencies = [
+ "chrono",
+ "keyring",
+ "serde",
+ "tray-icon",
+ "ureq",
+ "winit",
 ]
 
 [[package]]

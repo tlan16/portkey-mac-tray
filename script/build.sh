@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# build.sh - Build my-mac-tray as a macOS .app bundle ready for install.
+# build.sh - Build portkey-mac-tray as a macOS .app bundle ready for install.
 #
 # Usage:
 #   ./script/build.sh              # debug build
@@ -11,9 +11,9 @@
 set -euo pipefail
 
 # ---- config ---------------------------------------------------------------
-APP_NAME="MyMacTray"
-BINARY_NAME="my-mac-tray"
-BUNDLE_ID="com.frank-lan.my-mac-tray"
+APP_NAME="PortkeyMacTray"
+BINARY_NAME="portkey-mac-tray"
+BUNDLE_ID="com.frank-lan.portkey-mac-tray"
 BUNDLE_VERSION="0.1.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

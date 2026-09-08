@@ -1,4 +1,4 @@
-// Library module for my-mac-tray
+// Library module for portkey-mac-tray
 // This allows tests to run without including main.rs GUI initialization
 
 pub mod lib_portkey;

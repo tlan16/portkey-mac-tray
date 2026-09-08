@@ -1,7 +1,7 @@
 use keyring::Entry;
 use std::sync::LazyLock;
 
-const SERVICE_NAME: &str = "my-mac-tray";
+const SERVICE_NAME: &str = "portkey-mac-tray";
 const KEY_NAME: &str = "portkey-api-key";
 
 // ---------------------------------------------------------

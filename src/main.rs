@@ -1,5 +1,5 @@
-use my_mac_tray::app_config::{self, APP_CONFIG};
-use my_mac_tray::lib_portkey;
+use portkey_mac_tray::app_config::{self, APP_CONFIG};
+use portkey_mac_tray::lib_portkey;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
